@@ -1,9 +1,11 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: Python package
+name: Test
 permissions:
-  contents: read
+  contents: write
+  checks: write
+  pull-requests: write
 
 on:
   push:
@@ -19,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
     - uses: actions/checkout@v4
     - name: Install uv
@@ -30,4 +32,9 @@ jobs:
       run: |
         uv sync --all-extras --dev
     - name: Run tests
-      run: uv run pytest tests/vabaclient
+      run: uv run pytest --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=. tests/vabaclient | tee pytest-coverage.txt
+    - name: Pytest Coverage Comment
+      uses: MishaKav/pytest-coverage-comment@v1.1.54
+      with:
+        pytest-coverage-path: ./pytest-coverage.txt
+        junitxml-path: ./pytest.xml
