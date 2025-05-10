@@ -1,69 +1,161 @@
-import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
+from unittest import mock
+from unittest.mock import AsyncMock
 
-from dotenv import load_dotenv
 import pytest
 
 from vabaclient.client import VabaClient
-
-load_dotenv()
+from pytest_httpx import HTTPXMock
 
 
 @pytest.mark.asyncio
-async def test_get_available_times():
+async def test_get_available_times(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(
+        url="https://wellness.vs.sparkleapp.sparkle.plus/proxy.php"
+            "?language=en"
+            "&apikey=43816A1657EC4FCB6E953B5BA3EEEen"
+            "&modul=sparkleTicketingOnline"
+            "&action=getPossibleUhrzeiten"
+            "&file=ajaxResponder.php",
+        method="POST",
+        match_content=b"datum=2025-01-02"
+                      b"&bereich="
+                      b"&Artikel_ID=2948"
+                      b"&anzahlPersonen=1",
+        json={
+            'data': {
+                'success': True,
+                'geoeffnetVon': '08:00',
+                'geoeffnetBis': '00:00',
+                'singleBlock': False,
+                'gesamtFrei': {
+                    '08:00': 0,
+                    '09:00': 50,
+                    '17:00': 27,
+                    '17:20': 27,
+                    '23:20': 0,
+                },
+                'uhrzeiten': {
+                    '08:00': 0,
+                    '09:00': 1,
+                    '17:00': 10,
+                    '17:20': 0,
+                    '23:20': 5,
+                }
+            },
+        }
+    )
+
     client = VabaClient("user", "password")
 
-    next_saturday = date.today() + timedelta(days=(12 - date.today().weekday()))
+    d = date(2025, 1, 2)
 
-    available_times = await client.get_available_times(next_saturday)
+    available_times = await client.get_available_times(d)
 
-    # we don't know the values
-    assert len(available_times) > 0
-    assert all(x["timestamp"].date() == next_saturday for x in available_times)
-    assert all(isinstance(x["count"], int) for x in available_times)
+    assert available_times == [
+        {'timestamp': datetime(2025, 1, 2, 9, 0), 'count': 1},
+        {'timestamp': datetime(2025, 1, 2, 17, 0), 'count': 10},
+        {'timestamp': datetime(2025, 1, 2, 23, 20), 'count': 5},
+    ]
 
 
 @pytest.mark.asyncio
-async def test_get_active_appointments():
-    username = os.environ["VABALI_USERNAME"]
-    password = os.environ["VABALI_PASSWORD"]
-    appointment_id = int(os.environ["VABALI_E2E_APPOINTMENT_ID"])
+async def test_get_active_appointments(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(
+        url='https://wellness.vs.sparkleapp.sparkle.plus/proxy.php'
+            '?key=ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+            '&language=en'
+            '&apikey=43816A1657EC4FCB6E953B5BA3EEEen'
+            '&modul=sparkleTicketingOnline'
+            '&file=userTermine.php',
+        text="""
+<hr>
+<h3>Juni 2025</h3>
+<li class="anwendungswrap" id="TicketingTermine_ID_100500">
+    <span aria-hidden="true" class="spkl-datum kalender-style-datum">
+        <span class="dayname">Sa</span>
+        <span class="day">21</span>
+        <span class="month">Juni</span>
+        <span class="year">2025</span>
+    </span>
+    <div class="anwendungscontent">
+        <div class="terminHeading">
+            <span class="artikel">reservation   03.02.2025 from 09:00    to 09:20   for Sobaka Ulybaka</span><br>
+            <span class="uhrzeit">Montag, 03.02.2025, <span class="spkl-secondaryTextColor">
+                <span class="Uhrzeit">09:00</span>
+            </span>
+        </div>
+        <div></div>
+    </div>
+    <div class="anwendungszusatzinfo">
+        <div class="buttons" style="flex-grow: 1;">
+            <button type="button" data-spkl-click="userTicketingTermine.showMoveTicketingTerminDialog(2316842)">Re-schedule</button>
+            <button type="button" data-spkl-click="userTicketingTermine.showVoucher(2316842)">Show ticket</button>
+            <button type="button" data-spkl-click="userTicketingTermine.showCode(2316842)">Show code</button>
+        </div>
+        <div class="anmerkungen" style="align-self: flex-end;"></div>
+    </div>
+</li>
+<div style="clear:both"></div>
+    """)
 
-    client = VabaClient(username, password)
+    client = VabaClient("test_user", "test_password")
+
+    login_mock = AsyncMock(return_value="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    client._get_login_token = login_mock
 
     appointments = await client.get_active_appointments()
 
-    assert len(appointments) == 1
-    assert appointments[0]["id"] == appointment_id
-    assert isinstance(appointments[0]["timestamp"], datetime)
+    login_mock.assert_called_once()
+
+    assert appointments == [
+        {'id': 100500, 'timestamp': datetime(2025, 2, 3, 9, 0)}
+    ]
 
 
 @pytest.mark.asyncio
-async def test_get_move_appointment():
-    username = os.environ["VABALI_USERNAME"]
-    password = os.environ["VABALI_PASSWORD"]
+async def test_update_appointment_time(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(
+        url="https://wellness.vs.sparkleapp.sparkle.plus/proxy.php"
+            "?key=ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "&language=en"
+            "&apikey=43816A1657EC4FCB6E953B5BA3EEEen"
+            "&modul=sparkleTicketingOnline"
+            "&file=ajaxResponder.php%3Faction%3DmoveTicket",
+        method="POST",
+        match_content=b"bereich="
+                      b"&modul=sparkleTicketingOnline"
+                      b"&Termine_ID=100500"
+                      b"&Datum=2025-03-04"
+                      b"&Uhrzeit=12%3A40",
+        json={'success': True}
+    )
 
-    client = VabaClient(username, password)
+    client = VabaClient("test_user", "test_password")
 
-    old_appointments = await client.get_active_appointments()
-    assert len(old_appointments) == 1
-    old_appointment = old_appointments[0]
+    login_mock = AsyncMock(return_value="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    client._get_login_token = login_mock
 
-    # appointments in one month on Saturday
-    d = date.today() + timedelta(days=30)
-    target_date = d + timedelta(days=(12 - d.weekday()))
-    appointments = await client.get_available_times(target_date)
+    await client.update_appointment_time(100500, datetime(2025, 3, 4, 12, 40))
 
-    # choose a new appointment
-    new_timestamp = None
-    for appointment in appointments:
-        if new_timestamp != old_appointment["timestamp"]:
-            new_timestamp = appointment["timestamp"]
-            break
 
-    await client.update_appointment_time(old_appointments[0]["id"], new_timestamp)
+@pytest.mark.asyncio
+async def test_login(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(
+        url='https://wellness.vs.sparkleapp.sparkle.plus/proxy.php'
+            '?key=ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+            '&language=en'
+            '&apikey=43816A1657EC4FCB6E953B5BA3EEEen'
+            '&modul=sparkleTicketingOnline'
+            '&file=ajaxResponder.php%3Faction%3Dlogin',
+        match_content=b"username=test_user&userpass=test_password",
+        json={'success': True, 'data': ''}
+    )
 
-    new_appointments = await client.get_active_appointments()
-    assert len(new_appointments) == 1
-    assert new_appointments[0]["id"] == old_appointments[0]["id"]
-    assert new_appointments[0]["timestamp"] == new_timestamp
+    client = VabaClient("test_user", "test_password")
+
+    def choice_firsts(population, k):
+        return population[:k]
+
+    with mock.patch('random.choices', choice_firsts):
+        await client._get_login_token()

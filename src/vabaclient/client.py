@@ -14,6 +14,7 @@ class Reservation(TypedDict):
     id: int
     timestamp: datetime.datetime
 
+
 class AvailableReservations(TypedDict):
     timestamp: datetime.datetime
     count: int
@@ -97,32 +98,6 @@ class VabaClient:
 
         return times
 
-    async def _get_login_token(self):
-        token = "".join(random.choices(string.ascii_uppercase + string.digits, k=26))
-
-        client = httpx.AsyncClient()
-        response = await client.post(
-            API_URL,
-            params={
-                "key": token,
-                "language": "en",
-                "apikey": API_KEY,
-                "modul": "sparkleTicketingOnline",
-                "file": "ajaxResponder.php?action=login",
-            },
-            data={
-                "username": self._username,
-                "userpass": self._password
-            },
-        )
-
-        response.raise_for_status()
-
-        if not response.json()["success"]:
-            raise Exception("Can't login")
-
-        return token
-
     async def update_appointment_time(self, appointment_id, timestamp):
         token = await self._get_login_token()
 
@@ -151,3 +126,29 @@ class VabaClient:
 
         if not response.json()["success"]:
             raise Exception("Can't update appointment")
+
+    async def _get_login_token(self):
+        token = "".join(random.choices(string.ascii_uppercase + string.digits, k=26))
+
+        client = httpx.AsyncClient()
+        response = await client.post(
+            API_URL,
+            params={
+                "key": token,
+                "language": "en",
+                "apikey": API_KEY,
+                "modul": "sparkleTicketingOnline",
+                "file": "ajaxResponder.php?action=login",
+            },
+            data={
+                "username": self._username,
+                "userpass": self._password
+            },
+        )
+
+        response.raise_for_status()
+
+        if not response.json()["success"]:
+            raise Exception("Can't login")
+
+        return token
