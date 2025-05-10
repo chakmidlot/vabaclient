@@ -1,0 +1,22 @@
+[project]
+name = "vabaclient"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.9"
+
+dependencies = [
+    "beautifulsoup4>=4.13.4",
+    "httpx>=0.28",
+    "python-dotenv>=1.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["vabaclient"]
+
