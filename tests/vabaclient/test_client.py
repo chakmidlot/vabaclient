@@ -4,7 +4,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from vabaclient.client import VabaClient
+from vabaclient.client import AvailableReservations, NotAuthorizedError, \
+    Reservation, ReservationNotFound, TimeSlotNotAvailableError, VabaClient, \
+    WrongCredentialsError
 from pytest_httpx import HTTPXMock
 
 
@@ -23,9 +25,9 @@ from pytest_httpx import HTTPXMock
                     '23:20': 5
                 },
                 [
-                    {'timestamp': datetime(2025, 1, 2, 9, 0), 'count': 1},
-                    {'timestamp': datetime(2025, 1, 2, 17, 0), 'count': 10},
-                    {'timestamp': datetime(2025, 1, 2, 23, 20), 'count': 5},
+                    AvailableReservations(timestamp=datetime(2025, 1, 2, 9, 0), count=1),
+                    AvailableReservations(timestamp=datetime(2025, 1, 2, 17, 0), count=10),
+                    AvailableReservations(timestamp=datetime(2025, 1, 2, 23, 20), count=5),
                 ]
         ),
     ]
@@ -113,7 +115,7 @@ async def test_get_available_times(available_times, expected, httpx_mock: HTTPXM
                 <div style="clear:both"></div>
             """,
             [
-                {'id': 100500, 'timestamp': datetime(2025, 2, 3, 9, 0)}
+                Reservation(id=100500, timestamp=datetime(2025, 2, 3, 9, 0))
             ]
         )
     ]
@@ -142,6 +144,20 @@ async def test_get_active_appointments(reservations, expected, httpx_mock: HTTPX
 
 
 @pytest.mark.asyncio
+async def test_get_active_appointments_not_authorized(httpx_mock: HTTPXMock):
+    client = VabaClient("test_user", "test_password")
+
+    httpx_mock.add_response(text='')
+    httpx_mock.add_response(text='')
+
+    login_mock = AsyncMock(return_value="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    client._get_login_token = login_mock
+
+    with pytest.raises(NotAuthorizedError):
+        await client.get_active_appointments()
+
+
+@pytest.mark.asyncio
 async def test_update_appointment_time(httpx_mock: HTTPXMock):
     httpx_mock.add_response(
         url="https://wellness.vs.sparkleapp.sparkle.plus/proxy.php"
@@ -156,7 +172,7 @@ async def test_update_appointment_time(httpx_mock: HTTPXMock):
                       b"&Termine_ID=100500"
                       b"&Datum=2025-03-04"
                       b"&Uhrzeit=12%3A40",
-        json={'success': True}
+        json={'success': True, 'data': ''}
     )
 
     client = VabaClient("test_user", "test_password")
@@ -168,10 +184,32 @@ async def test_update_appointment_time(httpx_mock: HTTPXMock):
 
 
 @pytest.mark.asyncio
-async def test_update_appointment_time_fails(httpx_mock: HTTPXMock):
+@pytest.mark.parametrize(
+    ("response", "expected"),
+    [
+        (
+            {'success': False, 'message': "Keine Rechte zum verschieben."},
+            ReservationNotFound()
+        ),
+        (
+            {'success': False},
+            Exception("Can't update appointment")
+        ),
+        (
+            {'success': True,
+             'data': "Ausgewählter Termin nicht mehr frei verfügbar."},
+            TimeSlotNotAvailableError()
+        ),
+        (
+            {'success': True, 'data': "Something went wrong"},
+            Exception("Can't update appointment")
+        ),
+    ]
+)
+async def test_update_appointment_time_fails(response, expected, httpx_mock: HTTPXMock):
     httpx_mock.add_response(
         method="POST",
-        json={'success': False}
+        json=response
     )
 
     client = VabaClient("test_user", "test_password")
@@ -179,8 +217,31 @@ async def test_update_appointment_time_fails(httpx_mock: HTTPXMock):
     login_mock = AsyncMock(return_value="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     client._get_login_token = login_mock
 
-    with pytest.raises(Exception, match="Can't update appointment"):
+    with pytest.raises(type(expected), match=str(expected)):
         await client.update_appointment_time(100500, datetime(2025, 3, 4, 12, 40))
+
+
+@pytest.mark.asyncio
+async def test_update_appointment_unauthorized(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(
+        method="POST",
+        status_code=500
+    )
+
+    httpx_mock.add_response(
+        method="POST",
+        status_code=500
+    )
+
+    client = VabaClient("test_user", "test_password")
+
+    login_mock = AsyncMock(return_value="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    client._get_login_token = login_mock
+
+    with pytest.raises(NotAuthorizedError):
+        await client.update_appointment_time(100500, datetime(2025, 3, 4, 12, 40))
+
+    assert login_mock.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -206,12 +267,56 @@ async def test_login(httpx_mock: HTTPXMock):
 
 
 @pytest.mark.asyncio
-async def test_login_failed(httpx_mock: HTTPXMock):
+async def test_login_keep_token(httpx_mock: HTTPXMock):
     httpx_mock.add_response(
-        json={'success': False}
+        json={'success': True, 'data': ''}
     )
 
     client = VabaClient("test_user", "test_password")
 
-    with pytest.raises(Exception, match="Can't login"):
+    assert client._token is None
+
+    token_1 = await client._get_login_token()
+    token_2 = await client._get_login_token()
+
+    assert token_1 == token_2
+
+
+@pytest.mark.asyncio
+async def test_login_failed_credentials(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(
+        json={'success': False, 'message': '''
+<span class="warning">Please check your details. Username and/or password are incorrect. If you forgot your password, click this link.</span>
+<div style="text-align:center;">
+    <a href="#!lostpass">Set password</a>
+</div>
+'''})
+
+    client = VabaClient("test_user", "test_password")
+
+    with pytest.raises(WrongCredentialsError):
+        await client._get_login_token()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        (None, "Can't login"),
+        ("Something is wrong", "Something is wrong"),
+    ]
+)
+async def test_login_failed_unknown(message, expected, httpx_mock: HTTPXMock):
+    response = {'success': False}
+
+    if message is not None:
+        response['message'] = message
+
+    httpx_mock.add_response(
+        json=response
+    )
+
+    client = VabaClient("test_user", "test_password")
+
+    with pytest.raises(Exception, match=expected):
         await client._get_login_token()

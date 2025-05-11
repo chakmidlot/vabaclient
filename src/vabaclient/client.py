@@ -1,7 +1,7 @@
 import datetime
 import random
 import string
-from typing import TypedDict
+from dataclasses import dataclass
 
 import httpx
 from bs4 import BeautifulSoup
@@ -10,14 +10,31 @@ API_URL = "https://wellness.vs.sparkleapp.sparkle.plus/proxy.php"
 API_KEY = "43816A1657EC4FCB6E953B5BA3EEEen"  # public key
 
 
-class Reservation(TypedDict):
+@dataclass
+class Reservation:
     id: int
     timestamp: datetime.datetime
 
 
-class AvailableReservations(TypedDict):
+@dataclass
+class AvailableReservations:
     timestamp: datetime.datetime
     count: int
+
+
+def auth(method):
+    async def wrapper(self, *args, **kwargs):
+        if self._token is None:
+            self._token = await self._get_login_token()
+
+        try:
+            return await method(self, *args, **kwargs)
+        except NotAuthorizedError:
+            self._token = None
+            self._token = await self._get_login_token()
+            return await method(self, *args, **kwargs)
+
+    return wrapper
 
 
 class VabaClient:
@@ -26,7 +43,11 @@ class VabaClient:
         self._username = username
         self._password = password
 
-    async def get_available_times(self, dt: datetime.date) -> list[AvailableReservations]:
+        self._token = None
+
+    @staticmethod
+    async def get_available_times(dt: datetime.date) -> list[
+        AvailableReservations]:
         client = httpx.AsyncClient()
         response = await client.post(
             API_URL,
@@ -60,27 +81,29 @@ class VabaClient:
 
             h, m = map(int, time.split(":"))
             appointment = datetime.datetime(dt.year, dt.month, dt.day, h, m)
-            appointments.append({
-                "timestamp": appointment,
-                "count": count
-            })
+            appointments.append(AvailableReservations(
+                timestamp=appointment,
+                count=count
+            ))
 
         return appointments
 
+    @auth
     async def get_active_appointments(self) -> list[Reservation]:
-        token = await self._get_login_token()
-
         client = httpx.AsyncClient()
 
         response = await client.get(
             API_URL,
             params={
-                "key": token,
+                "key": self._token,
                 "language": "en",
                 "apikey": API_KEY,
                 "modul": "sparkleTicketingOnline",
                 "file": "userTermine.php",
             })
+
+        if response.text == '':
+            raise NotAuthorizedError()
 
         soup = BeautifulSoup(response.text, "html.parser")
         times = []
@@ -88,22 +111,23 @@ class VabaClient:
         for appointment in soup.select(".anwendungswrap"):
             termin_id = int(appointment["id"].split("_")[2])
 
-            _, date, time = map(str.strip, appointment.select_one(".uhrzeit").text.split(","))
+            _, date, time = map(str.strip,
+                                appointment.select_one(".uhrzeit").text.split(
+                                    ","))
 
             ts = datetime.datetime.strptime(f"{date} {time}", "%d.%m.%Y %H:%M")
 
-            times.append({
-                "id": termin_id,
-                "timestamp": ts
-            })
+            times.append(Reservation(
+                id=termin_id,
+                timestamp=ts
+            ))
 
-            times.sort(key=lambda x: x["timestamp"])
+            times.sort(key=lambda x: x.timestamp)
 
         return times
 
+    @auth
     async def update_appointment_time(self, appointment_id, timestamp):
-        token = await self._get_login_token()
-
         date = timestamp.strftime("%Y-%m-%d")
         time = timestamp.strftime("%H:%M")
 
@@ -112,7 +136,7 @@ class VabaClient:
         response = await client.post(
             API_URL,
             params={
-                "key": token,
+                "key": self._token,
                 "language": "en",
                 "apikey": API_KEY,
                 "modul": "sparkleTicketingOnline",
@@ -127,11 +151,31 @@ class VabaClient:
             }
         )
 
-        if not response.json()["success"]:
+        if response.status_code == 500:
+            raise NotAuthorizedError()
+
+        response = response.json()
+
+        if not response.get("success"):
+            message = response.get("message", "Can't update appointment")
+            if message == "Keine Rechte zum verschieben.":
+                raise ReservationNotFound()
+
             raise Exception("Can't update appointment")
+        else:
+            if response["data"] == "Ausgewählter Termin nicht mehr frei verfügbar.":
+                raise TimeSlotNotAvailableError()
+            if response["data"] == "":
+                return
+
+        raise Exception("Can't update appointment")
 
     async def _get_login_token(self):
-        token = "".join(random.choices(string.ascii_uppercase + string.digits, k=26))
+        if self._token is not None:
+            return self._token
+
+        token = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=26))
 
         client = httpx.AsyncClient()
         response = await client.post(
@@ -152,6 +196,29 @@ class VabaClient:
         response.raise_for_status()
 
         if not response.json()["success"]:
-            raise Exception("Can't login")
+            message = response.json().get("message", "Can't login")
 
+            if "Username and/or password are incorrect" in message:
+                raise WrongCredentialsError()
+            else:
+                raise Exception(message)
+
+        self._token = token
         return token
+
+
+class NotAuthorizedError(Exception):
+    pass
+
+
+class WrongCredentialsError(Exception):
+    pass
+
+
+class ReservationNotFound(Exception):
+    pass
+
+
+class TimeSlotNotAvailableError(Exception):
+    pass
+
