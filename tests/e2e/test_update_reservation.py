@@ -11,31 +11,31 @@ load_dotenv()
 
 @pytest.mark.asyncio
 @pytest.mark.e2e
-async def test_get_move_appointment():
+async def test_get_move_reservation():
     username = os.environ["VABALI_USERNAME"]
     password = os.environ["VABALI_PASSWORD"]
 
     client = VabaClient(username, password)
 
-    old_appointments = await client.get_active_appointments()
-    assert len(old_appointments) == 1
-    old_appointment = old_appointments[0]
+    old_reservations = await client.get_active_reservations()
+    assert len(old_reservations) == 1
+    old_reservation = old_reservations[0]
 
-    # appointments in one month on Saturday
+    # reservations in one month on Saturday
     d = date.today() + timedelta(days=30)
     target_date = d + timedelta(days=(12 - d.weekday()))
-    appointments = await client.get_available_times(target_date)
+    reservations = await client.get_available_reservations(target_date)
 
-    # choose a new appointment
+    # choose a new reservation
     new_timestamp = None
-    for appointment in appointments:
-        if new_timestamp != old_appointment.timestamp:
-            new_timestamp = appointment.timestamp
+    for reservation in reservations:
+        if new_timestamp != old_reservation.timestamp:
+            new_timestamp = reservation.timestamp
             break
 
-    await client.update_appointment_time(old_appointments[0].id, new_timestamp)
+    await client.update_reservation_time(old_reservations[0].id, new_timestamp)
 
-    new_appointments = await client.get_active_appointments()
-    assert len(new_appointments) == 1
-    assert new_appointments[0].id == old_appointments[0].id
-    assert new_appointments[0].timestamp == new_timestamp
+    new_reservations = await client.get_active_reservations()
+    assert len(new_reservations) == 1
+    assert new_reservations[0].id == old_reservations[0].id
+    assert new_reservations[0].timestamp == new_timestamp

@@ -46,7 +46,7 @@ class VabaClient:
         self._token = None
 
     @staticmethod
-    async def get_available_times(dt: datetime.date) -> list[
+    async def get_available_reservations(dt: datetime.date) -> list[
         AvailableReservations]:
         client = httpx.AsyncClient()
         response = await client.post(
@@ -70,7 +70,7 @@ class VabaClient:
 
         data = response.json()
 
-        appointments = []
+        reservations = []
 
         if not data["data"]["uhrzeiten"]:
             return []
@@ -80,16 +80,16 @@ class VabaClient:
                 continue
 
             h, m = map(int, time.split(":"))
-            appointment = datetime.datetime(dt.year, dt.month, dt.day, h, m)
-            appointments.append(AvailableReservations(
-                timestamp=appointment,
+            reservation = datetime.datetime(dt.year, dt.month, dt.day, h, m)
+            reservations.append(AvailableReservations(
+                timestamp=reservation,
                 count=count
             ))
 
-        return appointments
+        return reservations
 
     @auth
-    async def get_active_appointments(self) -> list[Reservation]:
+    async def get_active_reservations(self) -> list[Reservation]:
         client = httpx.AsyncClient()
 
         response = await client.get(
@@ -108,11 +108,11 @@ class VabaClient:
         soup = BeautifulSoup(response.text, "html.parser")
         times = []
 
-        for appointment in soup.select(".anwendungswrap"):
-            termin_id = int(appointment["id"].split("_")[2])
+        for reservation in soup.select(".anwendungswrap"):
+            termin_id = int(reservation["id"].split("_")[2])
 
             _, date, time = map(str.strip,
-                                appointment.select_one(".uhrzeit").text.split(
+                                reservation.select_one(".uhrzeit").text.split(
                                     ","))
 
             ts = datetime.datetime.strptime(f"{date} {time}", "%d.%m.%Y %H:%M")
@@ -127,7 +127,7 @@ class VabaClient:
         return times
 
     @auth
-    async def update_appointment_time(self, appointment_id, timestamp):
+    async def update_reservation_time(self, reservation_id, timestamp):
         date = timestamp.strftime("%Y-%m-%d")
         time = timestamp.strftime("%H:%M")
 
@@ -145,7 +145,7 @@ class VabaClient:
             data={
                 "bereich": "",
                 "modul": "sparkleTicketingOnline",
-                "Termine_ID": appointment_id,
+                "Termine_ID": reservation_id,
                 "Datum": date,
                 "Uhrzeit": time,
             }
@@ -157,18 +157,18 @@ class VabaClient:
         response = response.json()
 
         if not response.get("success"):
-            message = response.get("message", "Can't update appointment")
+            message = response.get("message", "Can't update reservation")
             if message == "Keine Rechte zum verschieben.":
                 raise ReservationNotFound()
 
-            raise Exception("Can't update appointment")
+            raise Exception("Can't update reservation")
         else:
             if response["data"] == "Ausgewählter Termin nicht mehr frei verfügbar.":
                 raise TimeSlotNotAvailableError()
             if response["data"] == "":
                 return
 
-        raise Exception("Can't update appointment")
+        raise Exception("Can't update reservation")
 
     async def _get_login_token(self):
         if self._token is not None:

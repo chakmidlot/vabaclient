@@ -68,7 +68,7 @@ async def test_get_available_times(available_times, expected, httpx_mock: HTTPXM
 
     d = date(2025, 1, 2)
 
-    available_times = await client.get_available_times(d)
+    available_times = await client.get_available_reservations(d)
 
     assert available_times == expected
 
@@ -121,7 +121,7 @@ async def test_get_available_times(available_times, expected, httpx_mock: HTTPXM
     ]
 )
 @pytest.mark.asyncio
-async def test_get_active_appointments(reservations, expected, httpx_mock: HTTPXMock):
+async def test_get_active_reservations(reservations, expected, httpx_mock: HTTPXMock):
     httpx_mock.add_response(
         url='https://wellness.vs.sparkleapp.sparkle.plus/proxy.php'
             '?key=ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -136,15 +136,15 @@ async def test_get_active_appointments(reservations, expected, httpx_mock: HTTPX
     login_mock = AsyncMock(return_value="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     client._get_login_token = login_mock
 
-    appointments = await client.get_active_appointments()
+    reservations = await client.get_active_reservations()
 
     login_mock.assert_called_once()
 
-    assert appointments == expected
+    assert reservations == expected
 
 
 @pytest.mark.asyncio
-async def test_get_active_appointments_not_authorized(httpx_mock: HTTPXMock):
+async def test_get_active_reservations_not_authorized(httpx_mock: HTTPXMock):
     client = VabaClient("test_user", "test_password")
 
     httpx_mock.add_response(text='')
@@ -154,11 +154,11 @@ async def test_get_active_appointments_not_authorized(httpx_mock: HTTPXMock):
     client._get_login_token = login_mock
 
     with pytest.raises(NotAuthorizedError):
-        await client.get_active_appointments()
+        await client.get_active_reservations()
 
 
 @pytest.mark.asyncio
-async def test_update_appointment_time(httpx_mock: HTTPXMock):
+async def test_update_reservation_time(httpx_mock: HTTPXMock):
     httpx_mock.add_response(
         url="https://wellness.vs.sparkleapp.sparkle.plus/proxy.php"
             "?key=ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -180,7 +180,7 @@ async def test_update_appointment_time(httpx_mock: HTTPXMock):
     login_mock = AsyncMock(return_value="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     client._get_login_token = login_mock
 
-    await client.update_appointment_time(100500, datetime(2025, 3, 4, 12, 40))
+    await client.update_reservation_time(100500, datetime(2025, 3, 4, 12, 40))
 
 
 @pytest.mark.asyncio
@@ -193,7 +193,7 @@ async def test_update_appointment_time(httpx_mock: HTTPXMock):
         ),
         (
             {'success': False},
-            Exception("Can't update appointment")
+            Exception("Can't update reservation")
         ),
         (
             {'success': True,
@@ -202,11 +202,11 @@ async def test_update_appointment_time(httpx_mock: HTTPXMock):
         ),
         (
             {'success': True, 'data': "Something went wrong"},
-            Exception("Can't update appointment")
+            Exception("Can't update reservation")
         ),
     ]
 )
-async def test_update_appointment_time_fails(response, expected, httpx_mock: HTTPXMock):
+async def test_update_reservation_time_fails(response, expected, httpx_mock: HTTPXMock):
     httpx_mock.add_response(
         method="POST",
         json=response
@@ -218,11 +218,11 @@ async def test_update_appointment_time_fails(response, expected, httpx_mock: HTT
     client._get_login_token = login_mock
 
     with pytest.raises(type(expected), match=str(expected)):
-        await client.update_appointment_time(100500, datetime(2025, 3, 4, 12, 40))
+        await client.update_reservation_time(100500, datetime(2025, 3, 4, 12, 40))
 
 
 @pytest.mark.asyncio
-async def test_update_appointment_unauthorized(httpx_mock: HTTPXMock):
+async def test_update_reservation_unauthorized(httpx_mock: HTTPXMock):
     httpx_mock.add_response(
         method="POST",
         status_code=500
@@ -239,7 +239,7 @@ async def test_update_appointment_unauthorized(httpx_mock: HTTPXMock):
     client._get_login_token = login_mock
 
     with pytest.raises(NotAuthorizedError):
-        await client.update_appointment_time(100500, datetime(2025, 3, 4, 12, 40))
+        await client.update_reservation_time(100500, datetime(2025, 3, 4, 12, 40))
 
     assert login_mock.call_count == 2
 
