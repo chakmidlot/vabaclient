@@ -13,6 +13,7 @@ dependencies = [
 dev = [
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
     "pytest-httpx>=0.35.0",
     "python-dotenv>=1.1.0",
 ]

@@ -51,6 +51,9 @@ class VabaClient:
 
         appointments = []
 
+        if not data["data"]["uhrzeiten"]:
+            return []
+
         for time, count in data["data"]["uhrzeiten"].items():
             if count == 0:
                 continue
