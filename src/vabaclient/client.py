@@ -48,23 +48,23 @@ class VabaClient:
     @staticmethod
     async def get_available_reservations(dt: datetime.date) -> list[
         AvailableReservations]:
-        client = httpx.AsyncClient()
-        response = await client.post(
-            API_URL,
-            params={
-                "language": "en",
-                "apikey": API_KEY,
-                "modul": "sparkleTicketingOnline",
-                "file": "ajaxResponder.php",
-                "action": "getPossibleUhrzeiten"
-            },
-            data={
-                "datum": dt.strftime("%Y-%m-%d"),
-                "bereich": "",
-                "Artikel_ID": "2948",
-                "anzahlPersonen": "1"
-            }
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                API_URL,
+                params={
+                    "language": "en",
+                    "apikey": API_KEY,
+                    "modul": "sparkleTicketingOnline",
+                    "file": "ajaxResponder.php",
+                    "action": "getPossibleUhrzeiten"
+                },
+                data={
+                    "datum": dt.strftime("%Y-%m-%d"),
+                    "bereich": "",
+                    "Artikel_ID": "2948",
+                    "anzahlPersonen": "1"
+                }
+            )
 
         response.raise_for_status()
 
@@ -90,17 +90,16 @@ class VabaClient:
 
     @auth
     async def get_active_reservations(self) -> list[Reservation]:
-        client = httpx.AsyncClient()
-
-        response = await client.get(
-            API_URL,
-            params={
-                "key": self._token,
-                "language": "en",
-                "apikey": API_KEY,
-                "modul": "sparkleTicketingOnline",
-                "file": "userTermine.php",
-            })
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                API_URL,
+                params={
+                    "key": self._token,
+                    "language": "en",
+                    "apikey": API_KEY,
+                    "modul": "sparkleTicketingOnline",
+                    "file": "userTermine.php",
+                })
 
         if response.text == '':
             raise NotAuthorizedError()
@@ -131,25 +130,24 @@ class VabaClient:
         date = timestamp.strftime("%Y-%m-%d")
         time = timestamp.strftime("%H:%M")
 
-        client = httpx.AsyncClient()
-
-        response = await client.post(
-            API_URL,
-            params={
-                "key": self._token,
-                "language": "en",
-                "apikey": API_KEY,
-                "modul": "sparkleTicketingOnline",
-                "file": "ajaxResponder.php?action=moveTicket",
-            },
-            data={
-                "bereich": "",
-                "modul": "sparkleTicketingOnline",
-                "Termine_ID": reservation_id,
-                "Datum": date,
-                "Uhrzeit": time,
-            }
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                API_URL,
+                params={
+                    "key": self._token,
+                    "language": "en",
+                    "apikey": API_KEY,
+                    "modul": "sparkleTicketingOnline",
+                    "file": "ajaxResponder.php?action=moveTicket",
+                },
+                data={
+                    "bereich": "",
+                    "modul": "sparkleTicketingOnline",
+                    "Termine_ID": reservation_id,
+                    "Datum": date,
+                    "Uhrzeit": time,
+                }
+            )
 
         if response.status_code == 500:
             raise NotAuthorizedError()
@@ -177,21 +175,21 @@ class VabaClient:
         token = "".join(
             random.choices(string.ascii_uppercase + string.digits, k=26))
 
-        client = httpx.AsyncClient()
-        response = await client.post(
-            API_URL,
-            params={
-                "key": token,
-                "language": "en",
-                "apikey": API_KEY,
-                "modul": "sparkleTicketingOnline",
-                "file": "ajaxResponder.php?action=login",
-            },
-            data={
-                "username": self._username,
-                "userpass": self._password
-            },
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                API_URL,
+                params={
+                    "key": token,
+                    "language": "en",
+                    "apikey": API_KEY,
+                    "modul": "sparkleTicketingOnline",
+                    "file": "ajaxResponder.php?action=login",
+                },
+                data={
+                    "username": self._username,
+                    "userpass": self._password
+                },
+            )
 
         response.raise_for_status()
 
