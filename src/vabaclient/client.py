@@ -112,7 +112,7 @@ class VabaClient:
             termin_id = int(reservation["id"].split("_")[2])
 
             _, date, time = map(str.strip,
-                                reservation.select_one(".uhrzeit").text.split(
+                                reservation.select_one(".uhrzeit").text.split("\n")[0].split(
                                     ","))
 
             ts = datetime.datetime.strptime(f"{date} {time}", "%d.%m.%Y %H:%M")
@@ -148,7 +148,8 @@ class VabaClient:
                 "Termine_ID": reservation_id,
                 "Datum": date,
                 "Uhrzeit": time,
-            }
+            },
+            timeout=15,
         )
 
         if response.status_code == 500:
