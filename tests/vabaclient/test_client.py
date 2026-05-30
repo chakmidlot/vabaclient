@@ -84,39 +84,45 @@ async def test_get_available_times(available_times, expected, httpx_mock: HTTPXM
             []
         ),
         (
-            """
-                <hr>
-                <h3>Juni 2025</h3>
-                <li class="anwendungswrap" id="TicketingTermine_ID_100500">
-                    <span aria-hidden="true" class="spkl-datum kalender-style-datum">
-                        <span class="dayname">Sa</span>
-                        <span class="day">21</span>
-                        <span class="month">Juni</span>
-                        <span class="year">2025</span>
-                    </span>
-                    <div class="anwendungscontent">
-                        <div class="terminHeading">
-                            <span class="artikel">reservation   03.02.2025 from 09:00    to 09:20   for Sobaka Ulybaka</span><br>
-                            <span class="uhrzeit">Montag, 03.02.2025, <span class="spkl-secondaryTextColor">
-                                <span class="Uhrzeit">09:00</span>
-                            </span>
-                        </div>
-                        <div></div>
-                    </div>
-                    <div class="anwendungszusatzinfo">
-                        <div class="buttons" style="flex-grow: 1;">
-                            <button type="button" data-spkl-click="userTicketingTermine.showMoveTicketingTerminDialog(2316842)">Re-schedule</button>
-                            <button type="button" data-spkl-click="userTicketingTermine.showVoucher(2316842)">Show ticket</button>
-                            <button type="button" data-spkl-click="userTicketingTermine.showCode(2316842)">Show code</button>
-                        </div>
-                        <div class="anmerkungen" style="align-self: flex-end;"></div>
-                    </div>
-                </li>
-                <div style="clear:both"></div>
+            """<hr><h3>Juli 2026</h3>
+            <li class="anwendungswrap" id="TicketingTermine_ID_3005192">
+                <span aria-hidden="true" class="spkl-datum kalender-style-datum">
+                    <span class="dayname">Sa</span>
+                    <span class="day">18</span>
+                    <span class="month">Juli</span>
+                    <span class="year">2026</span>
+                </span>
+                <div class="anwendungscontent">
+                    <div class="terminHeading">
+                        <span class="artikel">Eintrittsreservierung p.P. am 18.07.2026 von 12:40 Uhr  bis 13:00 Uhr für Dzmitry Talkach</span>
+                                            <br>
+                                            <span class="uhrzeit">Samstag, 18.07.2026, <span class="spkl-secondaryTextColor"> <span class="Uhrzeit">12:40</span> Uhr </span>
+                                            <p class="bereichstext"></p>                </div>
+        
+                    <div>
+                                        </div>
+                </div>
+                <div class="anwendungszusatzinfo">
+                    <div class="buttons" style="flex-grow: 1;">
+                                                                    <button type="button"  data-spkl-click="userTicketingTermine.showMoveTicketingTerminDialog(3005192)">Termin Verschieben </button>
+                                                                    <button type="button" data-spkl-click="userTicketingTermine.showVoucher(3005192)">Ticket anzeigen</button>
+                            <button type="button" data-spkl-click="userTicketingTermine.showCode(3005192)">Code anzeigen</button>
+                                        </div>
+                    <div class="anmerkungen" style="align-self: flex-end;">
+                                    </div>
+                </div>
+            </li>
+                
+            <div style="clear:both"></div>
             """,
-            [
-                Reservation(id=100500, timestamp=datetime(2025, 2, 3, 9, 0))
-            ]
+            (
+                [
+                    Reservation(
+                        id=3005192,
+                        timestamp=datetime(2026, 7, 18, 12, 40),
+                    ),
+                ]
+            )
         )
     ]
 )

@@ -7,7 +7,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 API_URL = "https://wellness.vs.sparkleapp.sparkle.plus/proxy.php"
-API_KEY = "43816A1657EC4FCB6E953B5BA3EEEen"  # public key
+API_KEY = "43816A1657EC4FCB6E953B5BA3EEE"  # public key
 
 
 @dataclass
@@ -52,7 +52,6 @@ class VabaClient:
         response = await client.post(
             API_URL,
             params={
-                "language": "en",
                 "apikey": API_KEY,
                 "modul": "sparkleTicketingOnline",
                 "file": "ajaxResponder.php",
@@ -96,7 +95,6 @@ class VabaClient:
             API_URL,
             params={
                 "key": self._token,
-                "language": "en",
                 "apikey": API_KEY,
                 "modul": "sparkleTicketingOnline",
                 "file": "userTermine.php",
@@ -115,7 +113,7 @@ class VabaClient:
                                 reservation.select_one(".uhrzeit").text.split("\n")[0].split(
                                     ","))
 
-            ts = datetime.datetime.strptime(f"{date} {time}", "%d.%m.%Y %H:%M")
+            ts = datetime.datetime.strptime(f"{date} {time}", "%d.%m.%Y %H:%M Uhr")
 
             times.append(Reservation(
                 id=termin_id,
@@ -137,7 +135,6 @@ class VabaClient:
             API_URL,
             params={
                 "key": self._token,
-                "language": "en",
                 "apikey": API_KEY,
                 "modul": "sparkleTicketingOnline",
                 "file": "ajaxResponder.php?action=moveTicket",
